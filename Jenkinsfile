@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        // Your Docker Hub username and repository
+        // Your Docker Hub username and repository (Must be lowercase for image naming)
         DOCKER_IMAGE_NAME = "shubhamsharma1975/devops-todo-automation"
         // The Credential ID for your Docker Hub Access Token
         DOCKER_CREDENTIALS_ID = "dockerhub-token"
@@ -17,7 +17,6 @@ pipeline {
         // Stage 1: Clean the workspace before starting
         stage('Cleanup') {
             steps {
-                // Wipes the directory Jenkins uses for this job
                 cleanWs()
             }
         }
@@ -25,67 +24,38 @@ pipeline {
         // Stage 2: Get the latest code from GitHub
         stage('Checkout') {
             steps {
-                // Clones your repository's main branch
                 git branch: 'main', url: 'https://github.com/Shubham-Sharma-7/devops-todo-automation.git'
             }
         }
 
-        // Stage 3: Build the Java application using Maven
-        stage('Build') {
+        // Stage 3: Build the Java application and Run Tests
+        stage('Build & Test') {
             steps {
-                // Runs 'mvn clean package' which compiles, tests (by default), and packages the app
+                // Runs Maven phases: compile, test (from pom.xml), package
                 sh 'mvn clean package'
-            }
-        }
-
-        // Stage 4: Run automated tests using Maven
-        stage('Test') {
-            steps {
-                // Explicitly runs the test phase
                 sh 'mvn test'
             }
         }
 
-        // Stage 5: Build the Docker image using the Dockerfile
+        // Stage 4: Build the Docker image
         stage('Build Image') {
             steps {
                 script {
-                    // Builds the image and tags it with the Jenkins build number (e.g., :1, :2, etc.)
                     sh "docker build -t ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ."
                 }
             }
         }
 
-        // Stage 6: Push Image (Using --password-stdin with trimming and debug)
+        // Stage 5: Push Image (Using official docker.withRegistry for authentication)
         stage('Push Image') {
             steps {
-                // Securely load Docker Hub username and Access Token into variables
-                withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PAT')]) {
-                    script {
-                        // --- TRIM VARIABLES ---
-                        // Remove any leading/trailing whitespace just in case
-                        def trimmedUser = DOCKER_USER.trim()
-                        def trimmedPat = DOCKER_PAT.trim()
-                        // --- END TRIM ---
-
-                        // --- DEBUG LINES ---
-                        sh "echo 'Attempting Docker login for user: ${trimmedUser}'"
-                        sh "echo 'Token length (trimmed): ${trimmedPat.length()}'"
-                        // --- END OF DEBUG LINES ---
-
-                        // --- Use trimmed variables for login ---
-                        // Use the secure --password-stdin method
-                        sh "echo ${trimmedPat} | docker login -u ${trimmedUser} --password-stdin"
-
-                        // Push the image with the build number tag
+                script {
+                    // Use the internal Docker client integration and credentials store
+                    // This uses the access token stored in the 'dockerhub-token' ID
+                    docker.withRegistry('https://registry-1.docker.io', DOCKER_CREDENTIALS_ID) {
                         sh "docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-
-                        // Tag as 'latest' and push
                         sh "docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest"
                         sh "docker push ${DOCKER_IMAGE_NAME}:latest"
-
-                        // Log out from Docker Hub
-                        sh "docker logout"
                     }
                 }
             }
