@@ -56,28 +56,23 @@ pipeline {
             }
         }
 
-        // Stage 6: Push the built Docker image to Docker Hub
-        stage('Push Image') {
-            steps {
-                // Securely loads Docker Hub username and Access Token into variables
-                withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PAT')]) {
-                    script {
-                        // Log in to Docker Hub securely using the Access Token
-                        sh "echo ${DOCKER_PAT} | docker login -u ${DOCKER_USER} --password-stdin"
+        // Stage 6: Push Image
+                stage('Push Image') {
+                    steps {
+                        withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PAT')]) {
+                            script {
+                                // --- DEBUG LINE ADDED ---
+                                sh "echo 'Attempting Docker login for user: ${DOCKER_USER}'"
+                                // --- END OF DEBUG LINE ---
 
-                        // Push the image tagged with the build number
-                        sh "docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-
-                        // Tag the same image as 'latest'
-                        sh "docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest"
-                        // Push the 'latest' tag
-                        sh "docker push ${DOCKER_IMAGE_NAME}:latest"
-
-                        // Log out from Docker Hub
-                        sh "docker logout"
+                                sh "echo ${DOCKER_PAT} | docker login -u ${DOCKER_USER} --password-stdin"
+                                sh "docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+                                sh "docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest"
+                                sh "docker push ${DOCKER_IMAGE_NAME}:latest"
+                                sh "docker logout"
+                            }
+                        }
                     }
                 }
-            }
-        }
     }
 }
