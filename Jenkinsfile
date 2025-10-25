@@ -12,7 +12,6 @@ pipeline {
     }
 
     stages {
-
         stage('Cleanup') {
             steps {
                 cleanWs()
@@ -21,21 +20,26 @@ pipeline {
 
         stage('Checkout') {
             steps {
+                // The implicit checkout is not enough for the declarative pipeline,
+                // so we include the explicit git step here.
                 git branch: 'main', url: 'https://github.com/Shubham-Sharma-7/devops-todo-automation.git'
             }
         }
 
         stage('Build & Test') {
             steps {
-                sh 'mvn clean package -DskipTests=false'
+                // Use default Maven goals for package and test execution
+                sh 'mvn clean package'
             }
         }
 
+        // --- CORRECTED STAGE: Uses shell commands for guaranteed stability ---
         stage('Build Docker Image') {
             steps {
                 script {
                     echo "Building Docker image ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-                    app = docker.build("${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}")
+                    // Use standard shell command for building and tagging
+                    sh "docker build -t ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ."
                 }
             }
         }
@@ -44,9 +48,13 @@ pipeline {
             steps {
                 script {
                     echo "Authenticating to Docker Hub and pushing image..."
-                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_CREDENTIALS_ID) {
-                        app.push("${BUILD_NUMBER}")
-                        app.push("latest")
+                    // Use the canonical registry URL and secure credential ID
+                    docker.withRegistry('https://index.docker.io', DOCKER_CREDENTIALS_ID) {
+
+                        // Use shell commands for pushing and tagging
+                        sh "docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+                        sh "docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest"
+                        sh "docker push ${DOCKER_IMAGE_NAME}:latest"
                     }
                 }
             }
@@ -54,8 +62,8 @@ pipeline {
 
         stage('Verify Push') {
             steps {
+                // This verifies the image is accessible from the registry after the push
                 sh "docker pull ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-                sh "docker images ${DOCKER_IMAGE_NAME}"
             }
         }
     }
