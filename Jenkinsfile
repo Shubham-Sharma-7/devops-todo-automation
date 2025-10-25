@@ -51,8 +51,8 @@ pipeline {
             steps {
                 script {
                     // Use the internal Docker client integration and credentials store
-                    // This uses the access token stored in the 'dockerhub-token' ID
-                    docker.withRegistry('https://registry-1.docker.io', DOCKER_CREDENTIALS_ID) {
+                    // --- CHANGED LINE: Using the standard Docker Hub registry URL
+                    docker.withRegistry('https://index.docker.io', DOCKER_CREDENTIALS_ID) {
                         sh "docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
                         sh "docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest"
                         sh "docker push ${DOCKER_IMAGE_NAME}:latest"
