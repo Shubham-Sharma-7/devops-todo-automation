@@ -9,7 +9,7 @@ pipeline {
     environment {
         // Your Docker Hub username and repository
         DOCKER_IMAGE_NAME = "shubhamsharma1975/devops-todo-automation"
-        // The NEW Credential ID we created for the Access Token
+        // The Credential ID for your Docker Hub Access Token
         DOCKER_CREDENTIALS_ID = "dockerhub-token"
     }
 
@@ -56,23 +56,30 @@ pipeline {
             }
         }
 
-        // Stage 6: Push Image
-                stage('Push Image') {
-                    steps {
-                        withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PAT')]) {
-                            script {
-                                // --- DEBUG LINE ADDED ---
-                                sh "echo 'Attempting Docker login for user: ${DOCKER_USER}'"
-                                // --- END OF DEBUG LINE ---
+        // Stage 6: Push Image (Using direct password flag)
+        stage('Push Image') {
+            steps {
+                // Securely load Docker Hub username and Access Token into variables
+                withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PAT')]) {
+                    script {
+                        // Construct the command directly in Groovy, embedding the PAT
+                        // Jenkins will mask the PAT value in the console output
+                        sh """
+                            docker login -u ${DOCKER_USER} -p ${DOCKER_PAT}
+                        """
 
-                                sh "echo ${DOCKER_PAT} | docker login -u ${DOCKER_USER} --password-stdin"
-                                sh "docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-                                sh "docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest"
-                                sh "docker push ${DOCKER_IMAGE_NAME}:latest"
-                                sh "docker logout"
-                            }
-                        }
+                        // Push the image with the build number tag
+                        sh "docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+
+                        // Tag as 'latest' and push
+                        sh "docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest"
+                        sh "docker push ${DOCKER_IMAGE_NAME}:latest"
+
+                        // Log out from Docker Hub
+                        sh "docker logout"
                     }
                 }
+            }
+        }
     }
 }
