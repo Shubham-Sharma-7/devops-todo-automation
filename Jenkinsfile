@@ -56,21 +56,26 @@ pipeline {
             }
         }
 
-        // Stage 6: Push Image (Using --password-stdin with debug)
+        // Stage 6: Push Image (Using --password-stdin with trimming and debug)
         stage('Push Image') {
             steps {
                 // Securely load Docker Hub username and Access Token into variables
                 withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PAT')]) {
                     script {
+                        // --- TRIM VARIABLES ---
+                        // Remove any leading/trailing whitespace just in case
+                        def trimmedUser = DOCKER_USER.trim()
+                        def trimmedPat = DOCKER_PAT.trim()
+                        // --- END TRIM ---
+
                         // --- DEBUG LINES ---
-                        sh "echo 'Attempting Docker login for user: ${DOCKER_USER}'"
-                        sh "echo 'Token length: ${DOCKER_PAT.length()}'"
+                        sh "echo 'Attempting Docker login for user: ${trimmedUser}'"
+                        sh "echo 'Token length (trimmed): ${trimmedPat.length()}'"
                         // --- END OF DEBUG LINES ---
 
-                        // --- REVERTED LOGIN METHOD ---
+                        // --- Use trimmed variables for login ---
                         // Use the secure --password-stdin method
-                        sh "echo ${DOCKER_PAT} | docker login -u ${DOCKER_USER} --password-stdin"
-                        // --- END OF REVERTED METHOD ---
+                        sh "echo ${trimmedPat} | docker login -u ${trimmedUser} --password-stdin"
 
                         // Push the image with the build number tag
                         sh "docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
