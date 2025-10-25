@@ -56,12 +56,17 @@ pipeline {
             }
         }
 
-        // Stage 6: Push Image (Using direct password flag)
+        // Stage 6: Push Image (Using direct password flag with debug)
         stage('Push Image') {
             steps {
                 // Securely load Docker Hub username and Access Token into variables
                 withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PAT')]) {
                     script {
+                        // --- DEBUG LINES ADDED ---
+                        sh "echo 'Attempting Docker login for user: ${DOCKER_USER}'"
+                        sh "echo 'Token length: ${DOCKER_PAT.length()}'"
+                        // --- END OF DEBUG LINES ---
+
                         // Construct the command directly in Groovy, embedding the PAT
                         // Jenkins will mask the PAT value in the console output
                         sh """
