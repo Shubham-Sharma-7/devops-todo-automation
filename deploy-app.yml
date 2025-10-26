@@ -1,16 +1,22 @@
 ---
 - name: Deploy To-Do List Container
-  hosts: webservers # This targets the group from our inventory file
-  become: false     # We don't need 'sudo' because Docker runs as our user
+  hosts: webservers # This targets the 'webservers' group in inventory.ini
+  become: false     # We don't need 'sudo' for Docker Desktop
 
   vars:
-    docker_hub_user: "shubhamsharma1975"
+    # This variable will be loaded from your vault.yml file
+    docker_hub_user: "{{ vault_docker_hub_user }}"
     image_name: "{{ docker_hub_user }}/devops-todo-automation:latest"
     container_name: "todo-api"
+    # This variable will also be loaded from your vault.yml file
+    docker_hub_token: "{{ vault_docker_hub_token }}"
 
   tasks:
-    # --- WE HAVE REMOVED THE LOGIN TASK ---
-    # Ansible will now use your Mac's existing Docker login.
+    - name: Log in to Docker Hub
+      community.docker.docker_login:
+        registry_url: https://index.docker.io/v1/
+        username: "{{ docker_hub_user }}"
+        password: "{{ docker_hub_token }}"
 
     - name: Stop and remove existing 'todo-api' container
       community.docker.docker_container:
@@ -28,6 +34,6 @@
         name: "{{ container_name }}"
         image: "{{ image_name }}"
         state: started
-        pull: false # We already pulled the image
+        pull: false # We just pulled the image, no need to pull again
         ports:
-          - "8080:8080"
+          - "8080:8080" # Map host port 8080 to container port 8080
