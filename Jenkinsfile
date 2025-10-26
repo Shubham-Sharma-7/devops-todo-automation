@@ -9,10 +9,11 @@ pipeline {
     environment {
         DOCKER_IMAGE_NAME = "shubhamsharma1975/devops-todo-automation"
         DOCKER_CREDENTIALS_ID = "dockerhub-token"
+        // 1. Create a dedicated, isolated config directory for this build
+        DOCKER_CONFIG = "${env.WORKSPACE}/.docker-config"
     }
 
     stages {
-
         stage('Cleanup') {
             steps {
                 cleanWs()
@@ -27,51 +28,49 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-                sh 'mvn clean package -DskipTests=false'
+                sh 'mvn clean package'
             }
         }
 
-        // Build Docker image via shell (reliable on macOS)
-        stage('Build Docker Image') {
+        stage('Build Image') {
             steps {
-                script {
-                    echo "Building Docker image ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-                    sh "docker build -t ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ."
-                }
+                // 2. Tell the build command to use our isolated config
+                sh "docker --config ${DOCKER_CONFIG} build -t ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ."
             }
         }
 
-        // Push Docker image using shell + docker.withRegistry
-        stage('Push Docker Image') {
+        // --- THE FINAL PUSH STAGE FIX ---
+        stage('Push Image') {
             steps {
-                script {
-                    docker.withRegistry('https://index.docker.io', DOCKER_CREDENTIALS_ID) {
-                        echo "Pushing ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} to Docker Hub"
-                        sh "docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-                        echo "Tagging as latest..."
-                        sh "docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest"
-                        sh "docker push ${DOCKER_IMAGE_NAME}:latest"
+                // 3. Create the clean config directory
+                sh "mkdir -p ${DOCKER_CONFIG}"
+                // 4. Securely load credentials
+                withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PAT')]) {
+                    script {
+                        // 5. Log in, forcing it to write to OUR config file
+                        sh "echo ${DOCKER_PAT} | docker --config ${DOCKER_CONFIG} login -u ${DOCKER_USER} --password-stdin"
+
+                        // 6. Push, forcing it to READ from OUR config file
+                        sh "docker --config ${DOCKER_CONFIG} push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+
+                        // 7. Tag, forcing it to READ from OUR config file
+                        sh "docker --config ${DOCKER_CONFIG} tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest"
+
+                        // 8. Push, forcing it to READ from OUR config file
+                        sh "docker --config ${DOCKER_CONFIG} push ${DOCKER_IMAGE_NAME}:latest"
+
+                        // 9. Logout, forcing it to use OUR config file
+                        sh "docker --config ${DOCKER_CONFIG} logout"
                     }
                 }
             }
         }
-
-        stage('Verify Push') {
-            steps {
-                sh "docker pull ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
-                sh "docker images ${DOCKER_IMAGE_NAME}"
-            }
-        }
+        // --- END OF FIX ---
     }
 
     post {
-        success {
-            echo "✅ Build ${BUILD_NUMBER} pushed successfully to ${DOCKER_IMAGE_NAME}"
-        }
-        failure {
-            echo "❌ Build failed — check logs and Docker credentials."
-        }
         always {
+            // Clean up the workspace and our temporary docker config
             cleanWs()
         }
     }
