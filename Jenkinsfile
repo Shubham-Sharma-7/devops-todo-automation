@@ -9,11 +9,15 @@ pipeline {
     environment {
         DOCKER_IMAGE_NAME = "shubhamsharma1975/devops-todo-automation"
         DOCKER_CREDENTIALS_ID = "dockerhub-token"
-        ANSIBLE_VAULT_PASS_ID = "ansible-vault-pass" // Password
-        ANSIBLE_VAULT_FILE_ID = "ansible-vault-file" // Encrypted File
+        // ID for the vault.yml file
+        ANSIBLE_VAULT_FILE_ID = "ansible-vault-file"
+        // ID for the vault-pass.txt file
+        ANSIBLE_VAULT_PASS_FILE_ID = "ansible-vault-pass-file"
     }
 
     stages {
+        // ... (Cleanup, Checkout, Build, Build Image, Push Image stages are all perfect) ...
+
         stage('Cleanup') {
             steps {
                 cleanWs()
@@ -57,14 +61,13 @@ pipeline {
         stage('Deploy to Production') {
             steps {
                 script {
-                    // Load BOTH credentials
+                    // Load BOTH secret files
                     withCredentials([
-                        string(credentialsId: env.ANSIBLE_VAULT_PASS_ID, variable: 'VAULT_PASS'), // Loads the password
-                        file(credentialsId: env.ANSIBLE_VAULT_FILE_ID, variable: 'VAULT_FILE_PATH') // Loads the file and gives us its path
+                        file(credentialsId: env.ANSIBLE_VAULT_FILE_ID, variable: 'VAULT_FILE_PATH'), // Path to vault.yml
+                        file(credentialsId: env.ANSIBLE_VAULT_PASS_FILE_ID, variable: 'VAULT_PASS_FILE_PATH') // Path to vault-pass.txt
                     ]) {
-                        // $VAULT_FILE_PATH is now the path to the temporary vault.yml file
-                        // This command is now 100% complete
-                        sh "ANSIBLE_VAULT_PASSWORD=${VAULT_PASS} ansible-playbook -i inventory.ini deploy-app.yml -e '@${VAULT_FILE_PATH}'"
+                        // This command tells Ansible to use the vault-pass.txt file as its password
+                        sh "ansible-playbook -i inventory.ini deploy-app.yml -e '@${VAULT_FILE_PATH}' --vault-password-file ${VAULT_PASS_FILE_PATH}"
                     }
                 }
             }
