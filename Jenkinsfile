@@ -51,26 +51,29 @@ pipeline {
             }
         }
 
-        // --- THIS STAGE REPLACES THE ANSIBLE STAGE ---
+        // --- THIS STAGE IS UPDATED ---
         stage('Deploy to Kubernetes') {
             steps {
                 script {
                     echo 'Applying Kubernetes manifests...'
-                    // We need to tell kubectl where our cluster is.
-                    // For Docker Desktop, it's 'docker-desktop'.
+
+                    // 1. Select the context (this worked)
                     sh 'kubectl config use-context docker-desktop'
 
-                    // Apply the deployment and service files from our repo
+                    // 2. --- THIS IS THE FIX ---
+                    // Tell kubectl to use the host's special DNS name instead of 127.0.0.1
+                    sh 'kubectl config set-cluster docker-desktop --server=https://host.docker.internal:6443'
+
+                    // 3. Apply the manifests
                     sh 'kubectl apply -f deployment.yaml'
                     sh 'kubectl apply -f service.yaml'
 
-                    // This is the most important command.
-                    // It tells K8s to update the running deployment with the new image.
+                    // 4. Trigger the rolling update
                     sh "kubectl rollout restart deployment todo-app-deployment"
                 }
             }
         }
-        // --- END OF NEW STAGE ---
+        // --- END OF UPDATE ---
     }
 
     post {
