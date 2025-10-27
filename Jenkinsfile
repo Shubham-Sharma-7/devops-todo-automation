@@ -61,8 +61,8 @@ pipeline {
                     sh 'kubectl config use-context docker-desktop'
 
                     // 2. --- THIS IS THE FIX ---
-                    // Tell kubectl to use the host's special DNS name instead of 127.0.0.1
-                    sh 'kubectl config set-cluster docker-desktop --server=https://host.docker.internal:6443'
+                    // Tell kubectl to use the name that matches the SSL certificate
+                    sh 'kubectl config set-cluster docker-desktop --server=https://kubernetes.docker.internal:6443'
 
                     // 3. Apply the manifests
                     sh 'kubectl apply -f deployment.yaml'
