@@ -1,2 +1,2 @@
-This is my fully automated pipeline with webhooks!
-Now fully automated it placing ansible also in jenkins pipeline
+This is my complete CI/CD pipeline.
+TESTING FULL AUTOMATION (KUBERNETES)
