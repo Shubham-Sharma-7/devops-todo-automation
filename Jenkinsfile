@@ -9,12 +9,11 @@ pipeline {
     environment {
         DOCKER_IMAGE_NAME = "shubhamsharma1975/devops-todo-automation"
         DOCKER_CREDENTIALS_ID = "dockerhub-token"
-        ANSIBLE_VAULT_CRED_ID = "ansible-vault-pass"
+        ANSIBLE_VAULT_PASS_ID = "ansible-vault-pass" // Password
+        ANSIBLE_VAULT_FILE_ID = "ansible-vault-file" // Encrypted File
     }
 
     stages {
-        // ... (Cleanup, Checkout, Build, Build Image, Push Image stages are all perfect) ...
-
         stage('Cleanup') {
             steps {
                 cleanWs()
@@ -54,13 +53,18 @@ pipeline {
             }
         }
 
-        // --- UPDATED DEPLOY STAGE (REMOVED 'tools' BLOCK) ---
+        // --- FINAL DEPLOY STAGE ---
         stage('Deploy to Production') {
             steps {
                 script {
-                    withCredentials([string(credentialsId: env.ANSIBLE_VAULT_CRED_ID, variable: 'VAULT_PASS')]) {
-                        // This 'sh' command will now work because Ansible is installed in the container
-                        sh "ANSIBLE_VAULT_PASSWORD=${VAULT_PASS} ansible-playbook -i inventory.ini deploy-app.yml -e '@vault.yml'"
+                    // Load BOTH credentials
+                    withCredentials([
+                        string(credentialsId: env.ANSIBLE_VAULT_PASS_ID, variable: 'VAULT_PASS'), // Loads the password
+                        file(credentialsId: env.ANSIBLE_VAULT_FILE_ID, variable: 'VAULT_FILE_PATH') // Loads the file and gives us its path
+                    ]) {
+                        // $VAULT_FILE_PATH is now the path to the temporary vault.yml file
+                        // This command is now 100% complete
+                        sh "ANSIBLE_VAULT_PASSWORD=${VAULT_PASS} ansible-playbook -i inventory.ini deploy-app.yml -e '@${VAULT_FILE_PATH}'"
                     }
                 }
             }
