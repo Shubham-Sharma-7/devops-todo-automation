@@ -9,15 +9,9 @@ pipeline {
     environment {
         DOCKER_IMAGE_NAME = "shubhamsharma1975/devops-todo-automation"
         DOCKER_CREDENTIALS_ID = "dockerhub-token"
-        // ID for the vault.yml file
-        ANSIBLE_VAULT_FILE_ID = "ansible-vault-file"
-        // ID for the vault-pass.txt file
-        ANSIBLE_VAULT_PASS_FILE_ID = "ansible-vault-pass-file"
     }
 
     stages {
-        // ... (Cleanup, Checkout, Build, Build Image, Push Image stages are all perfect) ...
-
         stage('Cleanup') {
             steps {
                 cleanWs()
@@ -57,22 +51,26 @@ pipeline {
             }
         }
 
-        // --- FINAL DEPLOY STAGE ---
-        stage('Deploy to Production') {
+        // --- THIS STAGE REPLACES THE ANSIBLE STAGE ---
+        stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    // Load BOTH secret files
-                    withCredentials([
-                        file(credentialsId: env.ANSIBLE_VAULT_FILE_ID, variable: 'VAULT_FILE_PATH'), // Path to vault.yml
-                        file(credentialsId: env.ANSIBLE_VAULT_PASS_FILE_ID, variable: 'VAULT_PASS_FILE_PATH') // Path to vault-pass.txt
-                    ]) {
-                        // This command tells Ansible to use the vault-pass.txt file as its password
-                        sh "ansible-playbook -i inventory.ini deploy-app.yml -e '@${VAULT_FILE_PATH}' --vault-password-file ${VAULT_PASS_FILE_PATH}"
-                    }
+                    echo 'Applying Kubernetes manifests...'
+                    // We need to tell kubectl where our cluster is.
+                    // For Docker Desktop, it's 'docker-desktop'.
+                    sh 'kubectl config use-context docker-desktop'
+
+                    // Apply the deployment and service files from our repo
+                    sh 'kubectl apply -f deployment.yaml'
+                    sh 'kubectl apply -f service.yaml'
+
+                    // This is the most important command.
+                    // It tells K8s to update the running deployment with the new image.
+                    sh "kubectl rollout restart deployment todo-app-deployment"
                 }
             }
         }
-        // --- END OF UPDATE ---
+        // --- END OF NEW STAGE ---
     }
 
     post {
